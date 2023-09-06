@@ -1,0 +1,840 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Cisco Systems Identity Services Engine (New VPC). This template deploys Cisco ISE VMs
+  into a new VPC with a Multi-AZ redundant configuration.
+  See the Quick Start documentation for more details. **WARNING** You will
+  be billed for the On-Demand instances and related AWS resources if you
+  create a stack from this template (qs-1tfq7mgcj).
+Metadata:
+  LintSpellExclude:
+    - openapi
+    - pxGrid
+    - Cisco
+    - compute-1
+    - com
+    - pem
+    - amazonaws
+    - myhostname
+    - mykeypair
+    - hostname
+    - failover
+    - events
+    - state
+    - machine
+    - console
+    - plaintext
+    - Management
+    - Cloud
+
+  cfn-lint:
+    config:
+      ignore_checks:
+        - W9001 # Changing parameter name requires a code change.
+  QuickStartDocumentation:
+    EntrypointName: "Launch into a new VPC"
+
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: VPC network configuration
+        Parameters:
+          - VPCCIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+          - LBPrivateAddressSubnet1
+          - LBPrivateAddressSubnet2
+      - Label:
+          default: AWS Partner Solution configuration
+        Parameters:
+          - QSS3BucketName
+          - QSS3BucketRegion
+          - QSS3KeyPrefix
+      - Label:
+          default: ISE small-deployment instance details
+        Parameters:
+          - Node1Hostname
+          - Node2Hostname
+          - KeyPairName
+          - TimeZone
+          - ISEInstanceType
+          - ISEVersion
+          - EBSEncrypt
+          - StorageSize
+          - FailoverRate
+          - AutoFailover
+          - HealthcheckRate
+      - Label:
+          default: ISE network configuration
+        Parameters:
+          - DNSDomain
+      - Label:
+          default: ISE services
+        Parameters:
+          - ERSapi
+          - OpenAPI
+          - PXGrid
+          - PXGridCloud
+      - Label:
+          default: User details
+        Parameters:
+          - password
+          - ConfirmPwd
+          - EmailSubscription
+    ParameterLabels:
+      VPCCIDR:
+        default: VPC CIDR
+      PublicSubnet1CIDR:
+        default: Public subnet 1 CIDR for Network Load Balancer
+      PublicSubnet2CIDR:
+        default: Public subnet 2 CIDR for Network Load Balancer
+      PrivateSubnet1CIDR:
+        default: Private subnet 1 CIDR for ISE VM
+      PrivateSubnet2CIDR:
+        default: Private subnet 2 CIDR for ISE VM
+      LBPrivateAddressSubnet1:
+        default: Private subnet 1 load balancer IP address
+      LBPrivateAddressSubnet2:
+        default: Private subnet 2 load balancer IP address
+      FailoverRate:
+        default: Failover rate
+      AutoFailover:
+        default: Auto failover
+      HealthcheckRate:
+        default: Health check rate
+      QSS3BucketName:
+        default: Quick Start S3 bucket name
+      QSS3BucketRegion:
+        default: Quick Start S3 bucket Region
+      QSS3KeyPrefix:
+        default: Quick Start S3 key prefix
+      EmailSubscription:
+        default: Email address
+      ERSapi:
+        default: ERS
+      OpenAPI:
+        default: OpenAPI
+      PXGrid:
+        default: pxGrid
+      PXGridCloud:
+        default: pxGrid Cloud
+      Node1Hostname:
+        default: Host name node 1
+      Node2Hostname:
+        default: Host name node 2
+      DNSDomain:
+        default: DNS domain
+      password:
+        default: Administrator password
+      ConfirmPwd:
+        default: Confirm password
+      KeyPairName:
+        default: Instance key pair
+      TimeZone:
+        default: Time zone
+      ISEInstanceType:
+        default: Instance type
+      ISEVersion:
+        default: Instance version
+      StorageSize:
+        default: Volume size
+      EBSEncrypt:
+        default: EBS encryption
+Parameters:
+  PrivateSubnet1CIDR:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form "x.x.x.x/17-28".
+    Default: 10.0.0.0/19
+    Description: CIDR block for private subnet 1, located in Availability Zone 1.
+    Type: String
+  PrivateSubnet2CIDR:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form "x.x.x.x/17-28".
+    Default: 10.0.32.0/19
+    Description: CIDR block for private subnet 2, located in Availability Zone 2.
+    Type: String
+  PublicSubnet1CIDR:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form "x.x.x.x/17-28".
+    Default: 10.0.128.0/20
+    Description: CIDR block for the public (DMZ) subnet 1, located in Availability Zone 1.
+    Type: String
+  PublicSubnet2CIDR:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form "x.x.x.x/17-28".
+    Default: 10.0.144.0/20
+    Description: CIDR block for the public (DMZ) subnet 2, located in Availability Zone 2.
+    Type: String
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-z]+([0-9a-z-\.]*[0-9a-z])*$
+    ConstraintDescription: >-
+      The S3 bucket name can include numbers, lowercase letters,
+      and hyphens (-), but it cannot start or end with a hyphen.
+    Default: aws-quickstart
+    Description: >-
+      Name of the S3 bucket for your copy of the deployment assets. Keep the default
+      name unless you are customizing the template. Changing the name updates code
+      references to point to a new location.
+    MinLength: 3
+    MaxLength: 63
+    Type: String
+  QSS3BucketRegion:
+    Default: us-east-1
+    Description: >-
+      AWS Region where the S3 bucket (QSS3BucketName) is hosted. Keep
+      the default Region unless you are customizing the template. Changing the Region
+      updates code references to point to a new location. When using your own bucket,
+      specify the Region.
+    Type: String
+  QSS3KeyPrefix:
+    AllowedPattern: ^([0-9a-zA-Z!-_\.\*'\(\)/]+/)*$
+    ConstraintDescription: >-
+      The S3 key prefix can include numbers, lowercase letters, uppercase letters,
+      hyphens (-), underscores (_), periods (.), asterisks (*), single quotes ('),
+      open parenthesis ((), close parenthesis ()), and forward slashes (/). End the
+      prefix with a forward slash.
+    Default: quickstart-cisco-ise-on-aws/
+    Description: >-
+      S3 key prefix that is used to simulate a folder for your copy of the
+      deployment assets. Keep the default prefix unless you are customizing
+      the template. Changing the prefix updates code references to point to
+      a new location.
+    Type: String
+  VPCCIDR:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$'
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-26
+    Default: 10.0.0.0/16
+    Description: CIDR block for the VPC.
+    Type: String
+  LBPrivateAddressSubnet1:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+    ConstraintDescription: IP address parameter must be in the form "x.x.x.x".
+    Default: 10.0.0.4
+    Description: Private IP address of load balancer for private subnet 1.
+    Type: String
+  LBPrivateAddressSubnet2:
+    AllowedPattern: '^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+    ConstraintDescription: IP address parameter must be in the form "x.x.x.x",
+    Default: 10.0.32.4
+    Description: Private IP address of load balancer for private subnet 2.
+    Type: String
+  KeyPairName:
+    Description: >-
+       Choose the key pair that you created or imported previously in your AWS account. If you don't have a key pair in your AWS account, create or import one before deploying this Partner Solution. A key pair is required to access the Cisco ISE instance using SSH (Secure Shell). For example, "ssh -i mykeypair.pem admin@myhostname.compute-1.amazonaws.com". Note: User names for ISE 3.1 and 3.2+ are "admin" and "iseadmin", respectively.
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    AllowedPattern: .+
+    ConstraintDescription: You must choose a key pair.
+  ISEInstanceType:
+    Type: String
+    Description: Cisco ISE EC2 instance type.
+    Default: c5.4xlarge
+    AllowedValues:
+      - c5.4xlarge
+      - m5.4xlarge
+      - c5.9xlarge
+      - t3.xlarge
+    ConstraintDescription: Choose one of the values provided.
+  ISEVersion:
+    Type: String
+    Description: ISE software version for the ISE instances.
+    AllowedValues:
+      - '3.1'
+      - '3.2'
+    Default: '3.1'
+  EmailSubscription:
+    Description: Email address for deployment health and failover status notifications.
+    Type: String
+  EBSEncrypt:
+    Description: Choose "true" to enable EBS encryption.
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'false'
+      - 'true'
+    ConstraintDescription: Choose "true" or "false".
+  ERSapi:
+    Description: Choose "yes" to enable ERS.
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    ConstraintDescription: Choose "yes" or "no".
+  OpenAPI:
+    Description: Choose "no" to disable OpenAPI.
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    ConstraintDescription: Choose "yes" or "no".
+  PXGrid:
+    Description: Chose "yes" to enable pxGrid.
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    ConstraintDescription: Choose "yes" or "no".
+  PXGridCloud:
+    Description: Choose "yes" to enable pxGrid Cloud.
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    ConstraintDescription: Choose "yes" or "no".
+  Node1Hostname:
+    Description: >-
+      Hostname for node 1, not to exceed 19 characters. Hostname can include alphanumeric characters and hyphen (-).
+    Type: String
+    Default: iseserver1
+    AllowedPattern: '^[a-zA-Z0-9-]{1,19}$'
+    ConstraintDescription: >-
+      Maximum length is 19 characters. Hostname can include alphanumeric characters and hyphen (-).
+  Node2Hostname:
+    Description: >-
+      Hostname for node 2, not to exceed 19 characters. Hostname can include alphanumeric characters and hyphen (-).
+    Type: String
+    Default: iseserver2
+    AllowedPattern: '^[a-zA-Z0-9-]{1,19}$'
+    ConstraintDescription: >-
+      Maximum length is 19 characters. Hostname can include alphanumeric characters and hyphen (-).
+  FailoverRate:
+    Description:
+      The frequency at which CloudWatch Events invokes the Lambda function that invokes the failover state machine.
+    Default: rate(60 minutes)
+    AllowedValues:
+      - rate(1 minute)
+      - rate(10 minutes)
+      - rate(60 minutes)
+    Type: String
+  HealthcheckRate:
+    Description:
+      The frequency at which CloudWatch Events invokes the Lambda function that checks ISE deployment health.
+    Default: rate(10 minutes)
+    AllowedValues:
+      - rate(1 minute)
+      - rate(10 minutes)
+      - rate(60 minutes)
+    Type: String
+  AutoFailover:
+    Description: Choose ENABLED to configure the failover state machine to run periodically as an EventBridge rule.
+    Type: String
+    Default: 'DISABLED'
+    AllowedValues:
+      - 'ENABLED'
+      - 'DISABLED'
+    ConstraintDescription: Choose ENABLED or DISABLED.
+  DNSDomain:
+    Description: >-
+      Enter a domain name (for example, "cisco.com"). Domain name can include ASCII characters, numbers, hyphen (-), and
+      period (.). If you use the wrong syntax, Cisco ISE services might not come
+      up on launch.
+    Type: String
+    Default: example.com
+    AllowedPattern: '^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$'
+    ConstraintDescription: >-
+      Cannot be an IP address. Domain name can include ASCII characters, numbers, hyphen (-), and period (.).
+  TimeZone:
+    Description: Choose a system time zone.
+    Type: String
+    Default: Etc/UTC
+    AllowedValues:
+      - Africa/Abidjan
+      - Africa/Accra
+      - Africa/Algiers
+      - Africa/Bissau
+      - Africa/Cairo
+      - Africa/Casablanca
+      - Africa/Ceuta
+      - Africa/El_Aaiun
+      - Africa/Johannesburg
+      - Africa/Juba
+      - Africa/Khartoum
+      - Africa/Lagos
+      - Africa/Maputo
+      - Africa/Monrovia
+      - Africa/Nairobi
+      - Africa/Ndjamena
+      - Africa/Sao_Tome
+      - Africa/Tripoli
+      - Africa/Tunis
+      - Africa/Windhoek
+      - America/Adak
+      - America/Anchorage
+      - America/Araguaina
+      - America/Argentina/Buenos_Aires
+      - America/Argentina/Catamarca
+      - America/Argentina/Cordoba
+      - America/Argentina/Jujuy
+      - America/Argentina/La_Rioja
+      - America/Argentina/Mendoza
+      - America/Argentina/Rio_Gallegos
+      - America/Argentina/Salta
+      - America/Argentina/San_Juan
+      - America/Argentina/San_Luis
+      - America/Argentina/Tucuman
+      - America/Argentina/Ushuaia
+      - America/Asuncion
+      - America/Atikokan
+      - America/Bahia
+      - America/Bahia_Banderas
+      - America/Barbados
+      - America/Belem
+      - America/Belize
+      - America/Blanc-Sablon
+      - America/Boa_Vista
+      - America/Bogota
+      - America/Boise
+      - America/Cambridge_Bay
+      - America/Campo_Grande
+      - America/Cancun
+      - America/Caracas
+      - America/Cayenne
+      - America/Chicago
+      - America/Chihuahua
+      - America/Costa_Rica
+      - America/Creston
+      - America/Cuiaba
+      - America/Curacao
+      - America/Danmarkshavn
+      - America/Dawson
+      - America/Dawson_Creek
+      - America/Denver
+      - America/Detroit
+      - America/Edmonton
+      - America/Eirunepe
+      - America/El_Salvador
+      - America/Fort_Nelson
+      - America/Fortaleza
+      - America/Glace_Bay
+      - America/Goose_Bay
+      - America/Grand_Turk
+      - America/Guatemala
+      - America/Guayaquil
+      - America/Guyana
+      - America/Halifax
+      - America/Havana
+      - America/Hermosillo
+      - America/Indiana/Indianapolis
+      - America/Indiana/Knox
+      - America/Indiana/Marengo
+      - America/Indiana/Petersburg
+      - America/Indiana/Tell_City
+      - America/Indiana/Vevay
+      - America/Indiana/Vincennes
+      - America/Indiana/Winamac
+      - America/Inuvik
+      - America/Iqaluit
+      - America/Jamaica
+      - America/Juneau
+      - America/Kentucky/Louisville
+      - America/Kentucky/Monticello
+      - America/La_Paz
+      - America/Lima
+      - America/Los_Angeles
+      - America/Maceio
+      - America/Managua
+      - America/Manaus
+      - America/Martinique
+      - America/Matamoros
+      - America/Mazatlan
+      - America/Menominee
+      - America/Merida
+      - America/Metlakatla
+      - America/Mexico_City
+      - America/Miquelon
+      - America/Moncton
+      - America/Monterrey
+      - America/Montevideo
+      - America/Nassau
+      - America/New_York
+      - America/Nipigon
+      - America/Nome
+      - America/Noronha
+      - America/North_Dakota/Beulah
+      - America/North_Dakota/Center
+      - America/North_Dakota/New_Salem
+      - America/Nuuk
+      - America/Ojinaga
+      - America/Panama
+      - America/Pangnirtung
+      - America/Paramaribo
+      - America/Phoenix
+      - America/Port-au-Prince
+      - America/Port_of_Spain
+      - America/Porto_Velho
+      - America/Puerto_Rico
+      - America/Punta_Arenas
+      - America/Rainy_River
+      - America/Rankin_Inlet
+      - America/Recife
+      - America/Regina
+      - America/Resolute
+      - America/Rio_Branco
+      - America/Santarem
+      - America/Santiago
+      - America/Santo_Domingo
+      - America/Sao_Paulo
+      - America/Scoresbysund
+      - America/Sitka
+      - America/St_Johns
+      - America/Swift_Current
+      - America/Tegucigalpa
+      - America/Thule
+      - America/Thunder_Bay
+      - America/Tijuana
+      - America/Toronto
+      - America/Vancouver
+      - America/Whitehorse
+      - America/Winnipeg
+      - America/Yakutat
+      - America/Yellowknife
+      - Antarctica/Casey
+      - Antarctica/Davis
+      - Antarctica/DumontDUrville
+      - Antarctica/Macquarie
+      - Antarctica/Mawson
+      - Antarctica/Palmer
+      - Antarctica/Rothera
+      - Antarctica/Syowa
+      - Antarctica/Troll
+      - Antarctica/Vostok
+      - Asia/Almaty
+      - Asia/Amman
+      - Asia/Anadyr
+      - Asia/Aqtau
+      - Asia/Aqtobe
+      - Asia/Ashgabat
+      - Asia/Atyrau
+      - Asia/Baghdad
+      - Asia/Baku
+      - Asia/Bangkok
+      - Asia/Barnaul
+      - Asia/Beirut
+      - Asia/Bishkek
+      - Asia/Brunei
+      - Asia/Chita
+      - Asia/Choibalsan
+      - Asia/Colombo
+      - Asia/Damascus
+      - Asia/Dhaka
+      - Asia/Dili
+      - Asia/Dubai
+      - Asia/Dushanbe
+      - Asia/Famagusta
+      - Asia/Gaza
+      - Asia/Hebron
+      - Asia/Ho_Chi_Minh
+      - Asia/Hong_Kong
+      - Asia/Hovd
+      - Asia/Irkutsk
+      - Asia/Jakarta
+      - Asia/Jayapura
+      - Asia/Jerusalem
+      - Asia/Kabul
+      - Asia/Kamchatka
+      - Asia/Karachi
+      - Asia/Kathmandu
+      - Asia/Khandyga
+      - Asia/Kolkata
+      - Asia/Krasnoyarsk
+      - Asia/Kuala_Lumpur
+      - Asia/Kuching
+      - Asia/Macau
+      - Asia/Magadan
+      - Asia/Makassar
+      - Asia/Manila
+      - Asia/Nicosia
+      - Asia/Novokuznetsk
+      - Asia/Novosibirsk
+      - Asia/Omsk
+      - Asia/Oral
+      - Asia/Pontianak
+      - Asia/Pyongyang
+      - Asia/Qatar
+      - Asia/Qostanay
+      - Asia/Qyzylorda
+      - Asia/Riyadh
+      - Asia/Sakhalin
+      - Asia/Samarkand
+      - Asia/Seoul
+      - Asia/Shanghai
+      - Asia/Singapore
+      - Asia/Srednekolymsk
+      - Asia/Taipei
+      - Asia/Tashkent
+      - Asia/Tbilisi
+      - Asia/Tehran
+      - Asia/Thimphu
+      - Asia/Tokyo
+      - Asia/Tomsk
+      - Asia/Ulaanbaatar
+      - Asia/Urumqi
+      - Asia/Ust-Nera
+      - Asia/Vladivostok
+      - Asia/Yakutsk
+      - Asia/Yangon
+      - Asia/Yekaterinburg
+      - Asia/Yerevan
+      - Atlantic/Azores
+      - Atlantic/Bermuda
+      - Atlantic/Canary
+      - Atlantic/Cape_Verde
+      - Atlantic/Faroe
+      - Atlantic/Madeira
+      - Atlantic/Reykjavik
+      - Atlantic/South_Georgia
+      - Atlantic/Stanley
+      - Australia/Adelaide
+      - Australia/Brisbane
+      - Australia/Broken_Hill
+      - Australia/Darwin
+      - Australia/Eucla
+      - Australia/Hobart
+      - Australia/Lindeman
+      - Australia/Lord_Howe
+      - Australia/Melbourne
+      - Australia/Perth
+      - Australia/Sydney
+      - CET
+      - CST6CDT
+      - EET
+      - EST
+      - EST5EDT
+      - Etc/GMT
+      - Etc/GMT+1
+      - Etc/GMT+10
+      - Etc/GMT+11
+      - Etc/GMT+12
+      - Etc/GMT+2
+      - Etc/GMT+3
+      - Etc/GMT+4
+      - Etc/GMT+5
+      - Etc/GMT+6
+      - Etc/GMT+7
+      - Etc/GMT+8
+      - Etc/GMT+9
+      - Etc/GMT-1
+      - Etc/GMT-10
+      - Etc/GMT-11
+      - Etc/GMT-12
+      - Etc/GMT-13
+      - Etc/GMT-14
+      - Etc/GMT-2
+      - Etc/GMT-3
+      - Etc/GMT-4
+      - Etc/GMT-5
+      - Etc/GMT-6
+      - Etc/GMT-7
+      - Etc/GMT-8
+      - Etc/GMT-9
+      - Etc/UTC
+      - Europe/Amsterdam
+      - Europe/Andorra
+      - Europe/Astrakhan
+      - Europe/Athens
+      - Europe/Belgrade
+      - Europe/Berlin
+      - Europe/Brussels
+      - Europe/Bucharest
+      - Europe/Budapest
+      - Europe/Chisinau
+      - Europe/Copenhagen
+      - Europe/Dublin
+      - Europe/Gibraltar
+      - Europe/Helsinki
+      - Europe/Istanbul
+      - Europe/Kaliningrad
+      - Europe/Kiev
+      - Europe/Kirov
+      - Europe/Lisbon
+      - Europe/London
+      - Europe/Luxembourg
+      - Europe/Madrid
+      - Europe/Malta
+      - Europe/Minsk
+      - Europe/Monaco
+      - Europe/Moscow
+      - Europe/Oslo
+      - Europe/Paris
+      - Europe/Prague
+      - Europe/Riga
+      - Europe/Rome
+      - Europe/Samara
+      - Europe/Saratov
+      - Europe/Simferopol
+      - Europe/Sofia
+      - Europe/Stockholm
+      - Europe/Tallinn
+      - Europe/Tirane
+      - Europe/Ulyanovsk
+      - Europe/Uzhgorod
+      - Europe/Vienna
+      - Europe/Vilnius
+      - Europe/Volgograd
+      - Europe/Warsaw
+      - Europe/Zaporozhye
+      - Europe/Zurich
+      - HST
+      - Indian/Chagos
+      - Indian/Christmas
+      - Indian/Cocos
+      - Indian/Kerguelen
+      - Indian/Mahe
+      - Indian/Maldives
+      - Indian/Mauritius
+      - Indian/Reunion
+      - MET
+      - MST
+      - MST7MDT
+      - PST8PDT
+      - Pacific/Apia
+      - Pacific/Auckland
+      - Pacific/Bougainville
+      - Pacific/Chatham
+      - Pacific/Chuuk
+      - Pacific/Easter
+      - Pacific/Efate
+      - Pacific/Enderbury
+      - Pacific/Fakaofo
+      - Pacific/Fiji
+      - Pacific/Funafuti
+      - Pacific/Galapagos
+      - Pacific/Gambier
+      - Pacific/Guadalcanal
+      - Pacific/Guam
+      - Pacific/Honolulu
+      - Pacific/Kiritimati
+      - Pacific/Kosrae
+      - Pacific/Kwajalein
+      - Pacific/Majuro
+      - Pacific/Marquesas
+      - Pacific/Nauru
+      - Pacific/Niue
+      - Pacific/Norfolk
+      - Pacific/Noumea
+      - Pacific/Pago_Pago
+      - Pacific/Palau
+      - Pacific/Pitcairn
+      - Pacific/Pohnpei
+      - Pacific/Port_Moresby
+      - Pacific/Rarotonga
+      - Pacific/Tahiti
+      - Pacific/Tarawa
+      - Pacific/Tongatapu
+      - Pacific/Wake
+      - Pacific/Wallis
+      - WET
+  password:
+    Description: >-
+      Password for the default admin, used to access the Cisco ISE GUI. Password must align with Cisco ISE password policy. Must contain 6-25 characters and contain at least one number, uppercase letter, and lowercase letter. Valid characters: A-Z, a-z, 0-9, and . , + = @ ~ ! _ - (hyphen). Do not use user name ("admin") or reverse user name ("nimda"). User names for ISE 3.1 and 3.2+ are "admin" and "iseadmin", respectively. Cannot contain "cisco" or "ocsic". Warning: This password displays in plaintext on the Edit user data page in the Amazon EC2 console.
+    NoEcho: 'True'
+    Type: String
+    AllowedPattern: >-
+      ^(?=.*?[A-Z])(?=.*?[a-z])(?i)(?!.*?admin|.*?cisco|.*?nimda|.*?ocsic)(?-i)(?=.*?[0-9]).{6,}$
+    ConstraintDescription: >-
+      Minimum of six characters. One digit, one uppercase, and one lowercase letter required. Do not use user name ("admin") or reverse user name ("nimda"). Cannot contain "cisco" or "ocsic".
+  ConfirmPwd:
+    Description: Confirm password.
+    NoEcho: 'True'
+    Type: String
+  StorageSize:
+    Description: >-
+      Storage size, 300GB–2400GB. We recommend 600GB+ for production use. Only use a storage size less than 600GB for evaluation purposes. Storage volume deleted when instance is terminated.
+    Type: Number
+    Default: '600'
+    MinValue: '300'
+    MaxValue: '2400'
+    ConstraintDescription: >-
+      Storage size, 300GB–2400GB. We recommend 600GB+ for production use. Only use a storage size less than 600GB for evaluation purposes. Storage volume deleted when instance is terminated.
+Conditions:
+  UsingDefaultBucket: !Equals
+    - !Ref QSS3BucketName
+    - aws-quickstart
+Rules:
+  PasswdMismatch:
+    Assertions:
+      - Assert: !Equals
+          - !Ref password
+          - !Ref ConfirmPwd
+        AssertDescription: Password mismatch
+Resources:
+  VPCStack:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL:
+        !Sub
+          - https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}submodules/quickstart-aws-vpc/templates/aws-vpc.template.yaml
+          - S3Region: !If [UsingDefaultBucket, !Ref 'AWS::Region', !Ref QSS3BucketRegion]
+            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+      Parameters:
+        AvailabilityZones: !Join [ ',', !GetAZs "" ]
+        NumberOfAZs: '2'
+        PrivateSubnet1ACIDR: !Ref PrivateSubnet1CIDR
+        PrivateSubnet2ACIDR: !Ref PrivateSubnet2CIDR
+        PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+        PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
+        VPCCIDR: !Ref VPCCIDR
+  WorkloadStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        !Sub
+          - https://${S3Bucket}.s3.${S3Region}.${AWS::URLSuffix}/${QSS3KeyPrefix}templates/quickstart-cisco-ise-on-aws-workload.template.yaml
+          - S3Region: !If [UsingDefaultBucket, !Ref 'AWS::Region', !Ref QSS3BucketRegion]
+            S3Bucket: !If [UsingDefaultBucket, !Sub '${QSS3BucketName}-${AWS::Region}', !Ref QSS3BucketName]
+      Parameters:
+        Node1Hostname: !Ref Node1Hostname
+        Node2Hostname: !Ref Node2Hostname
+        KeyPairName: !Ref KeyPairName
+        ManagementSubnet1Id:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PrivateSubnet1AID
+        ManagementSubnet2Id:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.PrivateSubnet2AID
+        TimeZone: !Ref TimeZone
+        ISEInstanceType: !Ref ISEInstanceType
+        ISEVersion: !Ref ISEVersion
+        EBSEncrypt: !Ref EBSEncrypt
+        StorageSize: !Ref StorageSize
+        DNSDomain: !Ref DNSDomain
+        ERSapi: !Ref ERSapi
+        OpenAPI: !Ref OpenAPI
+        PXGrid: !Ref PXGrid
+        PXGridCloud: !Ref PXGridCloud
+        password: !Ref password
+        ConfirmPwd: !Ref ConfirmPwd
+        EmailSubscription: !Ref EmailSubscription
+        AutoFailover: !Ref AutoFailover
+        FailoverRate: !Ref FailoverRate
+        HealthcheckRate: !Ref HealthcheckRate
+        LBPrivateAddressSubnet1: !Ref LBPrivateAddressSubnet1
+        LBPrivateAddressSubnet2: !Ref LBPrivateAddressSubnet2
+        QSS3BucketName:
+          Ref: QSS3BucketName
+        QSS3BucketRegion: !Ref QSS3BucketRegion
+        QSS3KeyPrefix:
+          Ref: QSS3KeyPrefix
+        VPCID:
+          Fn::GetAtt:
+          - VPCStack
+          - Outputs.VPCID
+        VPCCIDR: !Ref VPCCIDR
+
+Outputs:
+  VPCID:
+    Description: "The ID of the deployed ISE VPC"
+    Value:
+      Fn::GetAtt:
+      - VPCStack
+      - Outputs.VPCID
+  Postdeployment:
+    Description: See the deployment guide for postdeployment steps.
+    Value: https://fwd.aws/mA8Ym?
