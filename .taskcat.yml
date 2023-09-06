@@ -1,5 +1,5 @@
 project:
-  name: quickstart-cisco-ise-on-aws
+  name: cfn-ps-cisco-ise-on-aws
   regions:
     - us-east-1
   shorten_stack_name: true
