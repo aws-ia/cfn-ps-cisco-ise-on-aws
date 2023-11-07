@@ -8,7 +8,6 @@ project:
   package_lambda: false
   parameters:
     QSS3BucketName: $[taskcat_autobucket]
-    QSS3KeyPrefix: "quickstart-cisco-ise-on-aws/"
     QSS3BucketRegion: $[taskcat_current_region]
     KeyPairName:  $[taskcat_getkeypair]
     AvailabilityZones: $[taskcat_getaz_2]
