@@ -242,7 +242,8 @@ Parameters:
     AllowedValues:
       - '3.1'
       - '3.2'
-    Default: '3.1'
+      - '3.3'
+    Default: '3.2'
   EmailSubscription:
     Description: Email address for deployment health and failover status notifications.
     Type: String
